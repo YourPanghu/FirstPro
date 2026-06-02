@@ -1,0 +1,58 @@
+[
+  {
+    "name": "获取所有文章",
+    "method": "GET",
+    "url": "/posts",
+    "status": "PASS",
+    "status_code": 200,
+    "elapsed_ms": 514.99
+  },
+  {
+    "name": "获取单篇文章",
+    "method": "GET",
+    "url": "/posts/1",
+    "status": "PASS",
+    "status_code": 200,
+    "elapsed_ms": 483.67
+  },
+  {
+    "name": "获取不存在的文章",
+    "method": "GET",
+    "url": "/posts/99999",
+    "status": "PASS",
+    "status_code": 404,
+    "elapsed_ms": 480.77
+  },
+  {
+    "name": "按 userId 过滤",
+    "method": "GET",
+    "url": "/posts",
+    "status": "PASS",
+    "status_code": 200,
+    "elapsed_ms": 503.03
+  },
+  {
+    "name": "创建新文章",
+    "method": "POST",
+    "url": "/posts",
+    "status": "PASS",
+    "status_code": 201,
+    "elapsed_ms": 569.14
+  },
+  {
+    "name": "更新文章",
+    "method": "PUT",
+    "url": "/posts/1",
+    "status": "PASS",
+    "status_code": 200,
+    "elapsed_ms": 730.76
+  },
+  {
+    "name": "删除文章",
+    "method": "DELETE",
+    "url": "/posts/1",
+    "status": "PASS",
+    "status_code": 200,
+    "elapsed_ms": 884.16
+  }
+]

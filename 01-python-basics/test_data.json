@@ -1,0 +1,22 @@
+[
+  {
+    "method": "GET",
+    "url": "/posts/1",
+    "expected_status": 200
+  },
+  {
+    "method": "GET",
+    "url": "/posts/99",
+    "expected_status": 200
+  },
+  {
+    "method": "GET",
+    "url": "/posts/999",
+    "expected_status": 404
+  },
+  {
+    "method": "POST",
+    "url": "/posts",
+    "expected_status": 201
+  }
+]

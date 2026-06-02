@@ -1,0 +1,286 @@
+{
+  "info": {
+    "name": "FirstPro API 自动化测试合集",
+    "description": "基于 jsonplaceholder API 的接口测试集合。\n包含 GET/POST/PUT/DELETE 完整流程，可直接导入 Postman 运行。\n学习目标：掌握 Postman Collection 的组织方式和自动化测试写法。",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "firstpro_learning"
+  },
+  "item": [
+    {
+      "name": "01 - GET 查询文章列表",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "// Postman 自动化测试脚本 (Tests 标签)",
+              "// 这些代码会在请求完成后自动执行",
+              "",
+              "// 1. 检查状态码",
+              "pm.test('状态码为 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "// 2. 检查响应时间",
+              "pm.test('响应时间小于 2000ms', function () {",
+              "    pm.expect(pm.response.responseTime).to.be.below(2000);",
+              "});",
+              "",
+              "// 3. 检查返回数据是数组",
+              "const data = pm.response.json();",
+              "pm.test('返回数据是数组', function () {",
+              "    pm.expect(data).to.be.an('array');",
+              "});",
+              "",
+              "// 4. 检查数组不为空",
+              "pm.test('文章列表不为空', function () {",
+              "    pm.expect(data.length).to.be.above(0);",
+              "});",
+              "",
+              "// 5. 检查数组长度 <= 100（默认分页）",
+              "pm.test('默认分页不超过 100 条', function () {",
+              "    pm.expect(data.length).to.be.at.most(100);",
+              "});",
+              "",
+              "// 6. 检查每条记录都有必要字段",
+              "pm.test('每条文章包含 userId, id, title, body', function () {",
+              "    data.forEach(post => {",
+              "        pm.expect(post).to.have.all.keys('userId', 'id', 'title', 'body');",
+              "    });",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "https://jsonplaceholder.typicode.com/posts",
+          "protocol": "https",
+          "host": ["jsonplaceholder", "typicode", "com"],
+          "path": ["posts"]
+        }
+      }
+    },
+    {
+      "name": "02 - GET 查询单篇文章",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('状态码为 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const post = pm.response.json();",
+              "",
+              "pm.test('返回的文章 id 正确', function () {",
+              "    pm.expect(post.id).to.equal(1);",
+              "});",
+              "",
+              "pm.test('包含必要字段', function () {",
+              "    pm.expect(post).to.include.all.keys('userId', 'id', 'title', 'body');",
+              "});",
+              "",
+              "pm.test('title 非空', function () {",
+              "    pm.expect(post.title).to.be.a('string').and.not.empty;",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "https://jsonplaceholder.typicode.com/posts/1",
+          "protocol": "https",
+          "host": ["jsonplaceholder", "typicode", "com"],
+          "path": ["posts", "1"]
+        }
+      }
+    },
+    {
+      "name": "03 - POST 创建文章",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('创建成功，返回 201', function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "",
+              "const created = pm.response.json();",
+              "",
+              "pm.test('返回数据包含新 id', function () {",
+              "    pm.expect(created).to.have.property('id');",
+              "});",
+              "",
+              "pm.test('标题正确', function () {",
+              "    pm.expect(created.title).to.equal('自动化测试入门');",
+              "});",
+              "",
+              "// 保存 id 到环境变量，后续请求可以使用",
+              "pm.environment.set('lastPostId', created.id);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"自动化测试入门\",\n  \"body\": \"这是一篇关于 Postman 自动化测试的文章\",\n  \"userId\": 1\n}"
+        },
+        "url": {
+          "raw": "https://jsonplaceholder.typicode.com/posts",
+          "protocol": "https",
+          "host": ["jsonplaceholder", "typicode", "com"],
+          "path": ["posts"]
+        }
+      }
+    },
+    {
+      "name": "04 - PUT 更新文章",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('更新成功，返回 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const updated = pm.response.json();",
+              "",
+              "pm.test('标题已更新', function () {",
+              "    pm.expect(updated.title).to.include('已更新');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": 1,\n  \"title\": \"【已更新】自动化测试入门\",\n  \"body\": \"用 PUT 方法更新文章内容\",\n  \"userId\": 1\n}"
+        },
+        "url": {
+          "raw": "https://jsonplaceholder.typicode.com/posts/1",
+          "protocol": "https",
+          "host": ["jsonplaceholder", "typicode", "com"],
+          "path": ["posts", "1"]
+        }
+      }
+    },
+    {
+      "name": "05 - DELETE 删除文章",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('删除成功，返回 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "https://jsonplaceholder.typicode.com/posts/1",
+          "protocol": "https",
+          "host": ["jsonplaceholder", "typicode", "com"],
+          "path": ["posts", "1"]
+        }
+      }
+    },
+    {
+      "name": "06 - 异常场景：查询不存在的文章",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('不存在的文章应返回 404', function () {",
+              "    pm.response.to.have.status(404);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "https://jsonplaceholder.typicode.com/posts/99999",
+          "protocol": "https",
+          "host": ["jsonplaceholder", "typicode", "com"],
+          "path": ["posts", "99999"]
+        }
+      }
+    },
+    {
+      "name": "07 - 带查询参数 GET /posts?userId=1",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('状态码为 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const data = pm.response.json();",
+              "",
+              "pm.test('所有文章都属于 userId=1', function () {",
+              "    data.forEach(post => {",
+              "        pm.expect(post.userId).to.equal(1);",
+              "    });",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "https://jsonplaceholder.typicode.com/posts?userId=1",
+          "protocol": "https",
+          "host": ["jsonplaceholder", "typicode", "com"],
+          "path": ["posts"],
+          "query": [
+            {"key": "userId", "value": "1"}
+          ]
+        }
+      }
+    }
+  ]
+}
