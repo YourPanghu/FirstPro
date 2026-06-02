@@ -1,7 +1,9 @@
 # FirstPro - Python + 软件测试实战项目
 
+[![GitHub](https://img.shields.io/badge/GitHub-YourPanghu%2FFirstPro-blue?logo=github)](https://github.com/YourPanghu/FirstPro)
+
 > 🎯 目标：从零到能找到广深莞地区软件测试工作  
-> 📍 当前进度：Python 基础 ✅ → API 自动化 ✅ → Postman ✅ → **Selenium ✅**
+> 📍 当前进度：Python 基础 ✅ → API 自动化 ✅ → Postman ✅ → Selenium ✅ → **Git ✅**
 
 ---
 
