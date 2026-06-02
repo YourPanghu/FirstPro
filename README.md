@@ -3,7 +3,7 @@
 [![GitHub](https://img.shields.io/badge/GitHub-YourPanghu%2FFirstPro-blue?logo=github)](https://github.com/YourPanghu/FirstPro)
 
 > 🎯 目标：从零到能找到广深莞地区软件测试工作  
-> 📍 当前进度：Python 基础 ✅ → API 自动化 ✅ → Postman ✅ → Selenium ✅ → **Git ✅**
+> 📍 当前进度：Python 基础 ✅ → API 自动化 ✅ → Postman ✅ → Selenium ✅ → Git ✅ → **Selenium 深入 ✅**
 
 ---
 
@@ -28,11 +28,13 @@ FirstPro/
 │   ├── run_newman.js          # Newman CLI 运行器
 │   └── reports/               # Newman 测试报告
 │
-├── 04-selenium-automation/    # Selenium Web 自动化 🆕
+├── 04-selenium-automation/    # Selenium Web 自动化
 │   ├── 01_first_selenium.py   # 第一个 Selenium 脚本
 │   ├── 02_element_locators.py # 8种定位 + 3种等待
 │   ├── 03_page_object.py      # Page Object 设计模式
+│   ├── 03-1_imitate_page_object.py  # 🖊 Page Object 练手
 │   ├── 04_pytest_selenium.py  # Pytest + Selenium 整合
+│   ├── 05_selenium_advanced.py # 🆕 深入：弹窗/iframe/上传/窗口/下拉/悬停
 │   ├── pages/                 # 页面对象类
 │   ├── reports/               # HTML 测试报告
 │   └── screenshots/           # 截图（含失败截图）
@@ -86,6 +88,8 @@ node 03-postman-automation/run_newman.js
 | 🟢 实战 | API CRUD 完整流程、Pytest 框架 | ✅ 13/13 |
 | 🔵 工程 | Postman Collection + Newman CLI | ✅ |
 | 🟢 实战 | **Selenium: 元素定位、显式等待、Page Object** | ✅ 9/9 |
+| 🔵 进阶 | **Selenium 深入: Alert/iframe/上传/窗口/下拉/悬停** | ✅ 6/6 |
+| 🚀 工程 | Git + GitHub 项目上线 | ✅ |
 
 ---
 
@@ -98,8 +102,8 @@ node 03-postman-automation/run_newman.js
 | 测试用例设计 | ✅ | CRUD + 异常场景 |
 | 断言/数据驱动 | ✅ | @parametrize + JSON 数据文件 |
 | HTTP 协议 | ✅ | 状态码、请求头、响应体 |
-| **Selenium Web 自动化** | ✅ 🆕 | **8 种定位 + 显式等待 + Page Object** |
-| Git | ⏳ | 下一步 |
+| **Selenium Web 自动化** | ✅ 🆕 | **8 种定位 + 显式等待 + Page Object + Alert/iframe/上传/窗口切换** |
+| Git | ✅ | GitHub 项目 + 持续提交 |
 | JMeter/性能测试 | ⏳ | 后续模块 |
 | MySQL/SQL | ⏳ | 后续模块 |
 
