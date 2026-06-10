@@ -21,9 +21,16 @@ env/
 # 测试报告（自动生成的，每次跑都不一样）
 **/reports/*.html
 **/reports/*.json
+06-jmeter/reports/
 
 # 截图（自动生成的）
 **/screenshots/*.png
+
+# JMeter 原始结果（自动生成）
+**/results/*.jtl
+
+# 日志文件
+*.log
 
 # Pytest
 .pytest_cache/

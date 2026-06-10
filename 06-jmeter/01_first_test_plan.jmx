@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="5.0" jmeter="5.6.3">
+  <hashTree>
+    <!-- ============================================================
+    测试计划 (Test Plan) - JMeter 的顶层容器
+    所有测试元素都必须放在测试计划下面
+    ============================================================ -->
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="01-FirstTestPlan-HTTP基础入门" enabled="true">
+      <stringProp name="TestPlan.comments">
+        ============================================================
+        【第一个JMeter测试计划 - HTTP基础】
+
+        学完这个你就理解了 JMeter 的核心三层结构:
+
+        Test Plan (测试计划)
+          └── Thread Group (线程组 = 虚拟用户)
+               ├── Config Element (配置元件: HTTP默认值)
+               ├── Sampler (取样器: 发HTTP请求)
+               │    └── Listener (监听器: 看结果)
+               └── ...
+
+        本计划包含:
+        1. 1个线程组: 10个虚拟用户, 10秒内启动, 每个执行1次
+        2. HTTP请求默认值: 所有请求共用 base URL
+        3. 3个HTTP请求:
+           - GET /posts        查询列表  (最常见的读操作)
+           - GET /posts/1      查询单条  (带路径参数的GET)
+           - POST /posts       创建新数据 (POST + JSON body + Header)
+        4. 3种监听器: 查看结果树 / 聚合报告 / 用表格查看结果
+
+        性能指标速查:
+          TPS  = 每秒处理事务数 (越高越好)
+          P90  = 90%请求的响应时间 (比平均值更能反映真实体验)
+          错误率 = 失败请求占比 (压测目标是 0%)
+
+        面试重点:
+        "JMeter怎么做接口测试?" -> Thread Group + HTTP Request + Response Assertion
+        "怎么模拟并发?" -> Thread Group 的 num_threads + ramp_time
+        ============================================================
+      </stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <!-- functional_mode=true: 每个请求产生一个SampleResult子元素, 调试用 -->
+      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
+    </TestPlan>
+    <hashTree>
+      <!-- ============================================================
+      线程组 (Thread Group) - 虚拟用户
+      这是 JMeter 最核心的概念！每个线程 = 一个虚拟用户
+
+      关键属性:
+        num_threads = 并发用户数 (10个用户同时在线)
+        ramp_time   = 启动时间 (10秒内陆续上线, 避免瞬间冲击)
+        loop count  = 每个用户执行几次 (1次 = 每个用户只跑一遍)
+
+      公式: 总请求数 = num_threads × loop_count × sampler数量
+            本计划: 10 × 1 × 3 = 30 个请求
+      ============================================================ -->
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="用户组-10并发用户-逐步启动" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <!-- 【重要】num_threads = 并发数，这是压测报告里最常改的参数 -->
+        <stringProp name="ThreadGroup.num_threads">10</stringProp>
+        <!-- 【重要】ramp_time: 所有线程在N秒内逐步启动。
+             如果设0 = 瞬间全部上线, 会形成尖峰冲击, 不真实 -->
+        <stringProp name="ThreadGroup.ramp_time">10</stringProp>
+        <!-- LoopController: 控制每个线程循环多少次
+             loops=1  -> 每个用户跑1遍就停
+             loops=-1 -> 永远循环 (需要配合scheduler使用) -->
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="循环控制器" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">1</stringProp>
+        </elementProp>
+        <!-- scheduler=false: 不用定时器; 设true后可用duration指定运行时长 -->
+        <stringProp name="ThreadGroup.scheduler">false</stringProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+      </ThreadGroup>
+      <hashTree>
+        <!-- ============================================================
+        HTTP请求默认值 (HTTP Request Defaults) - 配置元件
+        【重要】写一次域名/端口/协议, 下面的所有请求自动继承
+        好处: 切换环境(测试/预发/生产)只需改这里
+        ============================================================ -->
+        <ConfigTestElement guiclass="HttpDefaultsGui" testclass="ConfigTestElement" testname="HTTP请求默认值-统一baseURL" enabled="true">
+          <stringProp name="HTTPSampler.domain">jsonplaceholder.typicode.com</stringProp>
+          <stringProp name="HTTPSampler.port">443</stringProp>
+          <!-- protocol: 开发环境用 http, 生产环境用 https -->
+          <stringProp name="HTTPSampler.protocol">https</stringProp>
+          <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+        </ConfigTestElement>
+        <hashTree/>
+
+        <!-- ============================================================
+        GET 请求 1: 获取文章列表
+        【关键】Sampler(取样器) = 发HTTP请求的组件
+        每个Sampler代表一个API调用
+        ============================================================ -->
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="GET-/posts-获取文章列表" enabled="true">
+          <stringProp name="TestPlan.comments">
+            【GET请求】最常用的HTTP方法, 用于查询数据
+            - path 只需写路径部分, 域名来自HTTP请求默认值
+            - follow_redirects=true 自动跟随重定向
+          </stringProp>
+          <stringProp name="HTTPSampler.method">GET</stringProp>
+          <stringProp name="HTTPSampler.path">/posts</stringProp>
+          <stringProp name="HTTPSampler.follow_redirects">true</stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <!-- ============================================================
+          查看结果树 (View Results Tree) - 监听器
+          【最常用的调试工具】可以看到每个请求和响应的完整内容
+          注意: GUI模式下保留, CLI模式下建议去掉(省内存)
+          ============================================================ -->
+          <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="查看结果树-GUI调试用" enabled="true">
+            <boolProp name="ResultCollector.error_logging">false</boolProp>
+            <objProp>
+              <name>saveConfig</name>
+              <value class="SampleSaveConfiguration">
+                <time>true</time>
+                <latency>true</latency>
+                <timestamp>true</timestamp>
+                <success>true</success>
+                <label>true</label>
+                <code>true</code>
+                <message>true</message>
+                <threadName>true</threadName>
+                <dataType>true</dataType>
+                <encoding>false</encoding>
+                <assertions>true</assertions>
+                <subresults>true</subresults>
+                <!-- CLI模式下建议把responseData设false, 否则.jtl文件会很大 -->
+                <responseData>false</responseData>
+                <samplerData>false</samplerData>
+                <xml>true</xml>
+                <fieldNames>true</fieldNames>
+                <responseHeaders>false</responseHeaders>
+                <requestHeaders>false</requestHeaders>
+                <responseDataOnError>false</responseDataOnError>
+                <saveAssertionResultsFailureMessage>true</saveAssertionResultsFailureMessage>
+                <assertionsResultsToSave>0</assertionsResultsToSave>
+                <bytes>true</bytes>
+                <sentBytes>true</sentBytes>
+                <url>true</url>
+                <threadCounts>true</threadCounts>
+                <idleTime>true</idleTime>
+                <connectTime>true</connectTime>
+              </value>
+            </objProp>
+            <stringProp name="filename"></stringProp>
+          </ResultCollector>
+          <hashTree/>
+
+          <!-- ============================================================
+          聚合报告 (Aggregate Report) - 监听器
+          【最重要的报告】压测结果就看它
+          核心指标:
+            Average(平均响应时间) / Median(中位数,即P50)
+            90% Line(P90) / 95% Line(P95) / 99% Line(P99)
+            Min / Max / Error% / Throughput(TPS)
+          ============================================================ -->
+          <ResultCollector guiclass="StatVisualizer" testclass="ResultCollector" testname="聚合报告-性能指标总览" enabled="true">
+            <boolProp name="ResultCollector.error_logging">false</boolProp>
+          </ResultCollector>
+          <hashTree/>
+
+          <!-- 用表格查看结果: 实时看到每条请求数据 -->
+          <ResultCollector guiclass="TableVisualizer" testclass="ResultCollector" testname="用表格察看结果-实时监控" enabled="true">
+            <boolProp name="ResultCollector.error_logging">false</boolProp>
+          </ResultCollector>
+          <hashTree/>
+        </hashTree>
+
+        <!-- ============================================================
+        GET 请求 2: 获取单篇文章 (带路径参数)
+        【关键】路径参数直接拼接在 path 里: /posts/1
+        ============================================================ -->
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="GET-/posts/1-获取单篇文章(路径参数)" enabled="true">
+          <stringProp name="TestPlan.comments">
+            【路径参数】直接在URL path里指定资源ID
+            测试时注意验证: ID存在(200) / ID不存在(404) 两种场景
+          </stringProp>
+          <stringProp name="HTTPSampler.method">GET</stringProp>
+          <stringProp name="HTTPSampler.path">/posts/1</stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="查看结果树" enabled="true">
+            <boolProp name="ResultCollector.error_logging">false</boolProp>
+          </ResultCollector>
+          <hashTree/>
+        </hashTree>
+
+        <!-- ============================================================
+        POST 请求: 创建文章 (带 JSON 请求体)
+        【关键】POST 需要: Content-Type头 + JSON Body
+        Body Data 请在 JMeter GUI 中添加, 内容:
+        {"title":"foo","body":"bar","userId":1}
+        ============================================================ -->
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="POST-/posts-创建文章(带JSON请求体)" enabled="true">
+          <stringProp name="TestPlan.comments">
+            【POST请求】写操作, 需要发送请求体
+            请在 GUI 的 Body Data 标签页添加JSON:
+            {"title":"foo","body":"bar","userId":1}
+            注意: JSONPlaceholder 不会真正存储数据, 但会返回201+模拟id
+          </stringProp>
+          <stringProp name="HTTPSampler.method">POST</stringProp>
+          <stringProp name="HTTPSampler.path">/posts</stringProp>
+          <!-- postBodyRaw=true: 使用原始格式发送body, 配合Content-Type头 -->
+          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+          <stringProp name="HTTPSampler.embedded_url_re"></stringProp>
+          <stringProp name="HTTPSampler.connect_timeout"></stringProp>
+          <stringProp name="HTTPSampler.response_timeout"></stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <!-- HTTP信息头管理器: POST JSON时必须声明Content-Type -->
+          <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="Content-Type: application/json" enabled="true">
+            <collectionProp name="HeaderManager.headers">
+              <elementProp name="" elementType="Header">
+                <stringProp name="Header.name">Content-Type</stringProp>
+                <stringProp name="Header.value">application/json; charset=UTF-8</stringProp>
+              </elementProp>
+            </collectionProp>
+          </HeaderManager>
+          <hashTree/>
+          <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="查看结果树" enabled="true">
+            <boolProp name="ResultCollector.error_logging">false</boolProp>
+          </ResultCollector>
+          <hashTree/>
+        </hashTree>
+      </hashTree>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan>

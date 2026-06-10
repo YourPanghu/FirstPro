@@ -1,0 +1,6 @@
+username,password,expected_role,user_id
+admin,admin123,administrator,1
+testuser,test456,tester,2
+developer,dev789,developer,3
+viewer,view000,readonly,4
+manager,mgr111,manager,5

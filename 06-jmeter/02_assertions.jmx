@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="5.0" jmeter="5.6.3">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="02-Assertions-五种断言详解" enabled="true">
+      <stringProp name="TestPlan.comments">
+        ============================================================
+        【断言专题 - 性能测试的"测试"从断言开始】
+
+        没有断言的性能测试只是"发请求", 有断言的才是"测试"!
+
+        断言 = 自动判断请求结果是 通过/失败 的规则
+        断言失败 -> JMeter 标记该请求为 Failed -> 出现在报告里
+
+        本计划逐一演示 5 种最常用的断言:
+
+        1. 响应断言     - 检查响应文本是否包含某内容（最常用）
+        2. JSON 断言    - 检查 JSON 字段值（接口测试必备）
+        3. 持续时间断言  - 响应时间不能超过 X ms（性能基线！）
+        4. 响应代码断言  - 状态码 200/201/404...（最基础）
+        5. 大小断言     - 响应体大小不能超过多少字节
+
+        面试重点: "怎么保证接口测试的正确性?" -> 多层次断言
+        ============================================================
+      </stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+    </TestPlan>
+    <hashTree>
+      <!-- 功能验证只用1个用户1次循环即可 -->
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="用户组-1线程1次循环(功能验证模式)" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <!-- 功能验证阶段用1个线程就够了, 不需要并发 -->
+        <stringProp name="ThreadGroup.num_threads">1</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="循环控制器" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">1</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.scheduler">false</stringProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+      </ThreadGroup>
+      <hashTree>
+        <ConfigTestElement guiclass="HttpDefaultsGui" testclass="ConfigTestElement" testname="HTTP请求默认值" enabled="true">
+          <stringProp name="HTTPSampler.domain">jsonplaceholder.typicode.com</stringProp>
+          <stringProp name="HTTPSampler.port">443</stringProp>
+          <stringProp name="HTTPSampler.protocol">https</stringProp>
+          <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+        </ConfigTestElement>
+        <hashTree/>
+
+        <!-- ============================================================
+        场景1: 响应断言 (Response Assertion) - 最常用的断言
+        【关键】检查响应体是否包含某个文本
+        匹配模式:
+          8 = Equals (完全等于)
+          16 = Contains (包含) -> 最常用
+          2 = Matches (正则匹配)
+        test_field:
+          response_data = 检查响应体
+          response_code = 检查状态码
+          response_headers = 检查响应头
+        ============================================================ -->
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="场景1-GET-/posts-响应文本包含断言" enabled="true">
+          <stringProp name="TestPlan.comments">
+            【场景1】检查 /posts 接口返回的JSON中是否包含 "userId" 字段
+            如果包含 -> 接口正常; 不包含 -> 接口可能挂了或返回格式变了
+          </stringProp>
+          <stringProp name="HTTPSampler.method">GET</stringProp>
+          <stringProp name="HTTPSampler.path">/posts</stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="断言-响应体包含userId字段" enabled="true">
+            <collectionProp name="Asserion.test_strings">
+              <!-- 检查JSON中是否包含 "userId" 这个key -->
+              <stringProp name="22343">&quot;userId&quot;</stringProp>
+            </collectionProp>
+            <!-- custom_message: 断言失败时显示的错误提示 -->
+            <stringProp name="Assertion.custom_message">响应中不包含 userId 字段！接口可能挂了或返回格式变了</stringProp>
+            <!-- test_field: 检查响应体(response_data), 也可以是response_code/response_headers -->
+            <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
+            <boolProp name="Assertion.assume_success">false</boolProp>
+            <!-- test_type: 16=Contains(包含) | 8=Equals(完全等于) | 2=Matches(正则) -->
+            <intProp name="Assertion.test_type">16</intProp>
+          </ResponseAssertion>
+          <hashTree/>
+          <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="查看结果树" enabled="true">
+            <boolProp name="ResultCollector.error_logging">false</boolProp>
+          </ResultCollector>
+          <hashTree/>
+        </hashTree>
+
+        <!-- ============================================================
+        场景2: JSON 断言 (JSONPath Assertion) - 接口测试必备
+        【关键】用 JSONPath 表达式精确提取JSON字段并校验
+        JSONPath 语法:
+          $.field        = 顶层字段
+          $.data[0].name = 嵌套字段
+          $.data[*].id   = 所有元素的id
+        JSONVALIDATION=true  -> 校验字段值
+        JSONVALIDATION=false -> 只检查字段是否存在
+        ============================================================ -->
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="场景2-GET-/posts/1-JSON断言" enabled="true">
+          <stringProp name="TestPlan.comments">【场景2】用JSONPath精确提取JSON字段值做验证</stringProp>
+          <stringProp name="HTTPSampler.method">GET</stringProp>
+          <stringProp name="HTTPSampler.path">/posts/1</stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <!-- JSON断言1: 校验 $.id 的值等于 1 -->
+          <JSONPathAssertion guiclass="JSONPathAssertionGui" testclass="JSONPathAssertion" testname="断言-id字段值为1" enabled="true">
+            <!-- JSONPath: $.id 表示取JSON根对象的 id 字段 -->
+            <stringProp name="JSON_PATH">$.id</stringProp>
+            <!-- EXPECTED_VALUE: 期望的字段值 -->
+            <stringProp name="EXPECTED_VALUE">1</stringProp>
+            <!-- JSONVALIDATION=true: 验证字段值是否等于EXPECTED_VALUE -->
+            <boolProp name="JSONVALIDATION">true</boolProp>
+            <boolProp name="EXPECT_NULL">false</boolProp>
+            <boolProp name="INVERT">false</boolProp>
+          </JSONPathAssertion>
+          <hashTree/>
+          <!-- JSON断言2: 检查 $.userId 字段存在即可, 不校验值 -->
+          <JSONPathAssertion guiclass="JSONPathAssertionGui" testclass="JSONPathAssertion" testname="断言-userId字段存在" enabled="true">
+            <stringProp name="JSON_PATH">$.userId</stringProp>
+            <stringProp name="EXPECTED_VALUE"></stringProp>
+            <!-- JSONVALIDATION=false: 只检查字段存在, 不检查值 -->
+            <boolProp name="JSONVALIDATION">false</boolProp>
+            <boolProp name="EXPECT_NULL">false</boolProp>
+            <boolProp name="INVERT">false</boolProp>
+          </JSONPathAssertion>
+          <hashTree/>
+          <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="查看结果树" enabled="true">
+            <boolProp name="ResultCollector.error_logging">false</boolProp>
+          </ResultCollector>
+          <hashTree/>
+        </hashTree>
+
+        <!-- ============================================================
+        场景3: 持续时间断言 (Duration Assertion) - 性能基线
+        【关键】这是"性能"测试特有的断言！
+        如果响应时间超过阈值 -> 标记失败
+        通常设: P95响应时间 = 阈值的1.5倍, 留缓冲
+        ============================================================ -->
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="场景3-GET-/posts-响应时间基线断言" enabled="true">
+          <stringProp name="TestPlan.comments">
+            【场景3】持续时间断言 = 性能基线
+            如果响应时间 > 3000ms -> 标记为失败
+            生产环境通常设更严格的阈值: 1000ms 或 2000ms
+          </stringProp>
+          <stringProp name="HTTPSampler.method">GET</stringProp>
+          <stringProp name="HTTPSampler.path">/posts</stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <!-- 持续时间断言: 响应时间超过3000ms就标记失败 -->
+          <DurationAssertion guiclass="DurationAssertionGui" testclass="DurationAssertion" testname="断言-响应时间不超过3000ms" enabled="true">
+            <!-- 单位: 毫秒(ms), 3000 = 3秒 -->
+            <stringProp name="DurationAssertion.duration">3000</stringProp>
+          </DurationAssertion>
+          <hashTree/>
+          <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="查看结果树" enabled="true">
+            <boolProp name="ResultCollector.error_logging">false</boolProp>
+          </ResultCollector>
+          <hashTree/>
+        </hashTree>
+
+        <!-- ============================================================
+        场景4: 响应代码断言 - 验证HTTP状态码
+        【关键】最基础的断言, 但也是必须的
+        test_field 改成 response_code 就能检查状态码
+
+        注意: JSONPlaceholder 对不存在的ID也返回200+{}而非404
+        真实项目中应该测试: 200(正常) / 201(创建) / 404(不存在) / 500(服务器错误)
+        ============================================================ -->
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="场景4-GET-/posts-状态码断言200" enabled="true">
+          <stringProp name="TestPlan.comments">
+            【场景4】验证HTTP状态码等于200
+            test_field=response_code, test_type=8(Equals)
+            面试时可以说: 先验证状态码(200/201/404), 再验证响应体内容
+            JSONPlaceholder 特点: 不存在的ID也返回200, 真实项目中的API会返回404
+          </stringProp>
+          <stringProp name="HTTPSampler.method">GET</stringProp>
+          <stringProp name="HTTPSampler.path">/posts</stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="断言-HTTP状态码=200" enabled="true">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="21413">200</stringProp>
+            </collectionProp>
+            <stringProp name="Assertion.custom_message">期望返回200, 实际返回了其他状态码, 接口可能挂了</stringProp>
+            <!-- 【关键】test_field 改为 response_code 检查状态码 -->
+            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+            <!-- test_type=8: 完全等于 -->
+            <intProp name="Assertion.test_type">8</intProp>
+          </ResponseAssertion>
+          <hashTree/>
+          <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="查看结果树" enabled="true">
+            <boolProp name="ResultCollector.error_logging">false</boolProp>
+          </ResultCollector>
+          <hashTree/>
+        </hashTree>
+
+        <!-- ============================================================
+        场景5: 大小断言 (Size Assertion) - 防止空响应
+        【关键】确保响应体不为空, 或不超过预期大小
+        常用于: 检测接口是否返回了空数据/异常短的数据
+        ============================================================ -->
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="场景5-GET-/posts-响应体大小断言" enabled="true">
+          <stringProp name="TestPlan.comments">
+            【场景5】确保响应体 > 100字节, 防止返回空数据
+            size=100, operator=5(大于) -> 响应体必须 > 100 bytes
+          </stringProp>
+          <stringProp name="HTTPSampler.method">GET</stringProp>
+          <stringProp name="HTTPSampler.path">/posts</stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <SizeAssertion guiclass="SizeAssertionGui" testclass="SizeAssertion" testname="断言-响应体大于100bytes" enabled="true">
+            <stringProp name="SizeAssertion.size">100</stringProp>
+            <!-- operator: 5=大于 | 3=等于 | 1=小于 | 7=不等于 -->
+            <intProp name="SizeAssertion.operator">5</intProp>
+            <!-- test_field_full_response_size: true=整个响应体; false=只算body -->
+            <boolProp name="SizeAssertion.test_field_network_size">false</boolProp>
+            <boolProp name="SizeAssertion.test_field_full_response_size">true</boolProp>
+          </SizeAssertion>
+          <hashTree/>
+          <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="查看结果树" enabled="true">
+            <boolProp name="ResultCollector.error_logging">false</boolProp>
+          </ResultCollector>
+          <hashTree/>
+        </hashTree>
+
+        <!-- 聚合报告: 看这5个请求的整体统计 -->
+        <ResultCollector guiclass="StatVisualizer" testclass="ResultCollector" testname="聚合报告" enabled="true">
+          <boolProp name="ResultCollector.error_logging">false</boolProp>
+        </ResultCollector>
+        <hashTree/>
+      </hashTree>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan>

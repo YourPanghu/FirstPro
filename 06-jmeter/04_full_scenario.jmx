@@ -1,0 +1,345 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="5.0" jmeter="5.6.3">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="04-FullScenario-完整性能测试场景" enabled="true">
+      <stringProp name="TestPlan.comments">
+        ============================================================
+        【完整性能测试场景 - 从冒烟到加压】
+
+        这个文件整合了前面学过的所有组件, 模拟真实工作流程:
+
+        === 完整性能测试流程 ===
+        第一步: 单用户冒烟测试 (场景A)
+              确保功能正确, 0错误 -> 再谈性能
+        第二步: 阶梯加压 (场景B)
+              逐步增加并发, 找到性能拐点
+        第三步: 分析报告
+              关注 TPS/P90/P95/错误率
+
+        === 本计划包含的组件 ===
+        [配置元件] HTTP请求默认值 / HTTP Cookie管理器 / 用户定义变量
+        [线程组]   2个线程组: 冒烟验证 + 负载测试
+        [取样器]   GET(列表/详情) / POST(创建) / PUT(更新) / DELETE(删除)
+        [定时器]   固定定时器(Think Time) / 高斯随机定时器(模拟人类偏差)
+        [断言]     响应代码 / JSON字段 / 持续时间 / 响应大小
+        [监听器]   聚合报告 / 查看结果树 / 汇总报告
+
+        === 性能拐点是什么 ===
+        当并发数增大时, TPS不再上升甚至下降, 响应时间急剧增长
+        这个临界点就是"性能拐点" -> 系统的最大承载能力
+
+        面试重点: "完整性能测试流程?" -> 冒烟->加压->找拐点->分析瓶颈
+        ============================================================
+      </stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <!-- ============================================================
+      用户定义变量 (User Defined Variables)
+      【关键】在TestPlan级别定义, 整个测试计划都能用 ${变量名}
+      用在: HTTP默认值 / 请求路径 / 断言消息 等任何地方
+      好处: 换环境改一处即可
+      ============================================================ -->
+      <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="全局变量-方便切换环境" enabled="true">
+        <collectionProp name="Arguments.arguments">
+          <elementProp name="BASE_URL" elementType="Argument">
+            <stringProp name="Argument.name">BASE_URL</stringProp>
+            <stringProp name="Argument.value">jsonplaceholder.typicode.com</stringProp>
+          </elementProp>
+          <elementProp name="PROTOCOL" elementType="Argument">
+            <stringProp name="Argument.name">PROTOCOL</stringProp>
+            <stringProp name="Argument.value">https</stringProp>
+          </elementProp>
+        </collectionProp>
+      </elementProp>
+    </TestPlan>
+    <hashTree>
+      <!-- ============================================================
+      HTTP请求默认值 - 引用全局变量 ${BASE_URL}
+      ============================================================ -->
+      <ConfigTestElement guiclass="HttpDefaultsGui" testclass="ConfigTestElement" testname="HTTP请求默认值-引用全局变量" enabled="true">
+        <stringProp name="HTTPSampler.domain">${BASE_URL}</stringProp>
+        <stringProp name="HTTPSampler.port">443</stringProp>
+        <stringProp name="HTTPSampler.protocol">${PROTOCOL}</stringProp>
+        <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+        <!-- connect_timeout: 连接超时5秒, 超过说明网络/服务器有问题 -->
+        <stringProp name="HTTPSampler.connect_timeout">5000</stringProp>
+        <!-- response_timeout: 响应超时10秒, 超过说明接口太慢 -->
+        <stringProp name="HTTPSampler.response_timeout">10000</stringProp>
+      </ConfigTestElement>
+      <hashTree/>
+
+      <!-- ============================================================
+      HTTP Cookie 管理器
+      【关键】每个线程自动维护独立的Cookie/Session
+      面试时: "JMeter怎么处理登录状态?" -> Cookie管理器自动管理
+      clearEachIteration=false: 同一线程多轮循环保持登录态
+      clearEachIteration=true: 每轮循环重置Cookie(模拟新用户)
+      ============================================================ -->
+      <CookieManager guiclass="CookiePanel" testclass="CookieManager" testname="HTTP Cookie管理器(自动维护Session)" enabled="true">
+        <stringProp name="TestPlan.comments">
+          【关键】自动处理Cookie, 无需手动管理
+          每个线程维护自己的Session -> 模拟真实多用户场景
+        </stringProp>
+        <!-- false: 同一线程多轮循环保持Cookie(保持登录态) -->
+        <boolProp name="CookieManager.clearEachIteration">false</boolProp>
+      </CookieManager>
+      <hashTree/>
+
+      <!-- ============================================================
+      【场景A】单用户冒烟测试 (Smoke Test)
+      目的: 性能测试前先确认功能正常
+      1线程 x 1次 = 5个请求(CRUD完整流程)
+      全部通过 -> 才能开始压测
+      ============================================================ -->
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="[场景A]单用户冒烟测试-CRUD功能验证" enabled="true">
+        <stringProp name="TestPlan.comments">
+          === 冒烟测试 (Smoke Test) ===
+          目的: 性能测试前先确认功能正确
+          如果这5个请求有任何一个失败 -> 先修bug, 不要压测
+          1个用户 x 1次循环 = 5个请求
+        </stringProp>
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <stringProp name="ThreadGroup.num_threads">1</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="循环控制器" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">1</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.scheduler">false</stringProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+      </ThreadGroup>
+      <hashTree>
+        <!-- ============================================================
+        场景A包含完整的 CRUD 操作: GET(查) -> POST(增) -> PUT(改) -> DELETE(删)
+        每个请求都有断言, 确保功能正确
+        ============================================================ -->
+
+        <!-- 1. GET 列表查询 - 最常用的读操作 -->
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="1-GET-/posts-查询列表" enabled="true">
+          <stringProp name="TestPlan.comments">【R-Read】查询操作, 验证返回200</stringProp>
+          <stringProp name="HTTPSampler.method">GET</stringProp>
+          <stringProp name="HTTPSampler.path">/posts</stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="断言-状态码200" enabled="true">
+            <collectionProp name="Asserion.test_strings"><stringProp name="200">200</stringProp></collectionProp>
+            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+            <intProp name="Assertion.test_type">8</intProp>
+          </ResponseAssertion>
+          <hashTree/>
+        </hashTree>
+
+        <!-- 2. GET 单条查询 -->
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="2-GET-/posts/1-查询详情" enabled="true">
+          <stringProp name="HTTPSampler.method">GET</stringProp>
+          <stringProp name="HTTPSampler.path">/posts/1</stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <JSONPathAssertion guiclass="JSONPathAssertionGui" testclass="JSONPathAssertion" testname="断言-id=1" enabled="true">
+            <stringProp name="JSON_PATH">$.id</stringProp>
+            <stringProp name="EXPECTED_VALUE">1</stringProp>
+            <boolProp name="JSONVALIDATION">true</boolProp>
+          </JSONPathAssertion>
+          <hashTree/>
+        </hashTree>
+
+        <!-- 3. POST 创建 -->
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="3-POST-/posts-创建数据" enabled="true">
+          <stringProp name="TestPlan.comments">【C-Create】创建操作, 期望返回201</stringProp>
+          <stringProp name="HTTPSampler.method">POST</stringProp>
+          <stringProp name="HTTPSampler.path">/posts</stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="Content-Type: application/json" enabled="true">
+            <collectionProp name="HeaderManager.headers">
+              <elementProp name="" elementType="Header">
+                <stringProp name="Header.name">Content-Type</stringProp>
+                <stringProp name="Header.value">application/json; charset=UTF-8</stringProp>
+              </elementProp>
+            </collectionProp>
+          </HeaderManager>
+          <hashTree/>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="断言-状态码201" enabled="true">
+            <collectionProp name="Asserion.test_strings"><stringProp name="201">201</stringProp></collectionProp>
+            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+            <intProp name="Assertion.test_type">8</intProp>
+          </ResponseAssertion>
+          <hashTree/>
+        </hashTree>
+
+        <!-- 4. PUT 更新 -->
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="4-PUT-/posts/1-更新数据" enabled="true">
+          <stringProp name="TestPlan.comments">【U-Update】更新操作, 期望返回200</stringProp>
+          <stringProp name="HTTPSampler.method">PUT</stringProp>
+          <stringProp name="HTTPSampler.path">/posts/1</stringProp>
+          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="Content-Type: application/json" enabled="true">
+            <collectionProp name="HeaderManager.headers">
+              <elementProp name="" elementType="Header">
+                <stringProp name="Header.name">Content-Type</stringProp>
+                <stringProp name="Header.value">application/json; charset=UTF-8</stringProp>
+              </elementProp>
+            </collectionProp>
+          </HeaderManager>
+          <hashTree/>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="断言-状态码200" enabled="true">
+            <collectionProp name="Asserion.test_strings"><stringProp name="200">200</stringProp></collectionProp>
+            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+            <intProp name="Assertion.test_type">8</intProp>
+          </ResponseAssertion>
+          <hashTree/>
+        </hashTree>
+
+        <!-- 5. DELETE 删除 -->
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="5-DELETE-/posts/1-删除数据" enabled="true">
+          <stringProp name="TestPlan.comments">【D-Delete】删除操作, 期望返回200</stringProp>
+          <stringProp name="HTTPSampler.method">DELETE</stringProp>
+          <stringProp name="HTTPSampler.path">/posts/1</stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="断言-状态码200" enabled="true">
+            <collectionProp name="Asserion.test_strings"><stringProp name="200">200</stringProp></collectionProp>
+            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+            <intProp name="Assertion.test_type">8</intProp>
+          </ResponseAssertion>
+          <hashTree/>
+        </hashTree>
+      </hashTree>
+
+      <!-- ============================================================
+      【场景B】阶梯加压负载测试
+      目的: 找到系统性能拐点
+      20线程, 10秒内启动, 持续30秒, 每个线程无限循环
+      关注指标: TPS / P90 / P95 / P99 / Error%
+
+      加压策略:
+        Ramp-Up=10s: 20个用户在10秒内逐步上线(每秒+2个)
+        持续30秒: 所有用户在线后持续压30秒
+        无限循环: 每个用户在30秒内反复执行请求 -> 更多样本
+      ============================================================ -->
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="[场景B]阶梯加压-20并发持续30秒" enabled="true">
+        <stringProp name="TestPlan.comments">
+          === 阶梯加压负载测试 ===
+          策略: 20个用户, 10秒内逐步上线(每秒+2个), 持续压30秒
+          每个用户无限循环发请求 -> 更多样本, 更真实的负载
+
+          关注这些指标的变化:
+          - TPS 是否随并发增加而上升? (理想: 线性上升)
+          - 响应时间是否随并发增加而恶化? (理想: 保持平稳)
+          - 错误率是否突然飙升? (拐点标志)
+          - P99 是否远大于 P50? (长尾问题, 少数请求特别慢)
+        </stringProp>
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <stringProp name="ThreadGroup.num_threads">20</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">10</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="循环控制器-无限循环" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <!-- loops=-1: 每个线程会一直循环, 直到 duration 时间到 -->
+          <stringProp name="LoopController.loops">-1</stringProp>
+        </elementProp>
+        <!-- scheduler=true + duration=30: 压30秒后自动停止 -->
+        <stringProp name="ThreadGroup.scheduler">true</stringProp>
+        <stringProp name="ThreadGroup.duration">30</stringProp>
+        <stringProp name="ThreadGroup.delay">0</stringProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+      </ThreadGroup>
+      <hashTree>
+        <!-- ============================================================
+        固定定时器 (Constant Timer)
+        【关键】模拟用户"思考时间", 两个请求之间等待500ms
+        不加定时器 -> 请求密集轰炸, 不真实 -> 测出来的结果偏乐观
+        加了定时器 -> 更接近真实用户行为
+        ============================================================ -->
+        <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="思考时间-固定500ms(模拟用户阅读)" enabled="true">
+          <stringProp name="TestPlan.comments">
+            【关键】模拟真实用户的"思考/阅读时间"
+            用户不会在0.01秒内连续点两个链接 -> 需要加延迟
+          </stringProp>
+          <!-- 500ms = 0.5秒, 模拟用户浏览列表后点击详情的时间 -->
+          <stringProp name="ConstantTimer.delay">500</stringProp>
+        </ConstantTimer>
+        <hashTree/>
+
+        <!-- ============================================================
+        高斯随机定时器 (Gaussian Random Timer)
+        【关键】在固定延迟基础上加随机偏差, 模拟人类的"不精确"
+        实际延迟 = 300ms + random(-200ms ~ +200ms)
+        结果: 有的请求间隔100ms(快速浏览), 有的间隔500ms(仔细阅读)
+        比纯固定定时器更真实!
+        ============================================================ -->
+        <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="随机偏差-高斯分布300ms±200ms" enabled="true">
+          <stringProp name="TestPlan.comments">
+            【关键】人类操作不是精确计时的 -> 加随机偏差
+            高斯分布(正态分布): 大多数延迟集中在300ms附近
+            极端值出现的概率小 -> 更符合真实场景
+          </stringProp>
+          <!-- delay中心值: 300ms -->
+          <stringProp name="ConstantTimer.delay">300</stringProp>
+          <!-- range偏差: ±200ms, 在100~500ms之间波动 -->
+          <stringProp name="RandomTimer.range">200</stringProp>
+        </GaussianRandomTimer>
+        <hashTree/>
+
+        <!-- 1. 获取列表 - 用户浏览 -->
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="GET-/posts-浏览列表" enabled="true">
+          <stringProp name="TestPlan.comments">【高频操作】用户浏览文章列表</stringProp>
+          <stringProp name="HTTPSampler.method">GET</stringProp>
+          <stringProp name="HTTPSampler.path">/posts</stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="断言-200" enabled="true">
+            <collectionProp name="Asserion.test_strings"><stringProp name="200">200</stringProp></collectionProp>
+            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+            <intProp name="Assertion.test_type">8</intProp>
+          </ResponseAssertion>
+          <hashTree/>
+          <!-- 压测场景下的持续时间断言: 列表查询不应超过5秒 -->
+          <DurationAssertion guiclass="DurationAssertionGui" testclass="DurationAssertion" testname="断言-响应不超过5000ms" enabled="true">
+            <stringProp name="DurationAssertion.duration">5000</stringProp>
+          </DurationAssertion>
+          <hashTree/>
+        </hashTree>
+
+        <!-- 2. 查看文章详情 -->
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="GET-/posts/1-查看文章详情" enabled="true">
+          <stringProp name="TestPlan.comments">【高频操作】用户点击文章查看详情</stringProp>
+          <stringProp name="HTTPSampler.method">GET</stringProp>
+          <stringProp name="HTTPSampler.path">/posts/1</stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="断言-200" enabled="true">
+            <collectionProp name="Asserion.test_strings"><stringProp name="200">200</stringProp></collectionProp>
+            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+            <intProp name="Assertion.test_type">8</intProp>
+          </ResponseAssertion>
+          <hashTree/>
+          <!-- 详情查询应该比列表查询更快, 阈值设更严格: 3秒 -->
+          <DurationAssertion guiclass="DurationAssertionGui" testclass="DurationAssertion" testname="断言-响应不超过3000ms" enabled="true">
+            <stringProp name="DurationAssertion.duration">3000</stringProp>
+          </DurationAssertion>
+          <hashTree/>
+        </hashTree>
+      </hashTree>
+
+      <!-- ============================================================
+      全局监听器 - 汇总两个线程组的所有结果
+      ============================================================ -->
+      <ResultCollector guiclass="StatVisualizer" testclass="ResultCollector" testname="聚合报告-总览" enabled="true">
+        <boolProp name="ResultCollector.error_logging">false</boolProp>
+      </ResultCollector>
+      <hashTree/>
+
+      <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="查看结果树-调试用" enabled="true">
+        <boolProp name="ResultCollector.error_logging">false</boolProp>
+      </ResultCollector>
+      <hashTree/>
+
+      <!-- 汇总报告: 比聚合报告精简, 适合CI/CD自动化 -->
+      <ResultCollector guiclass="SummaryReport" testclass="ResultCollector" testname="汇总报告-适合CI输出" enabled="true">
+        <boolProp name="ResultCollector.error_logging">false</boolProp>
+      </ResultCollector>
+      <hashTree/>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan>

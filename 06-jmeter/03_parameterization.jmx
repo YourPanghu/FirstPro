@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="5.0" jmeter="5.6.3">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="03-Parameterization-CSV数据驱动" enabled="true">
+      <stringProp name="TestPlan.comments">
+        ============================================================
+        目标：学会用 CSV 文件驱动测试数据（数据驱动在性能测试中的应用）
+
+        核心组件：CSV Data Set Config
+        - 读取 CSV 文件，每行 = 一组测试数据
+        - 每个线程取一行（共享模式下按顺序或随机取）
+        - 变量名 = CSV 列名，引用用 ${变量名}
+
+        配合线程组：
+        - 5个线程 x CSV有5行 = 每个线程各取一行数据
+        - Recycle on EOF = true  -> 取完从头循环（压测时常用）
+        - Stop thread on EOF = true  -> 取完线程停止（功能测试时用）
+
+        面试重点："数据驱动怎么做？" -> CSV Data Set Config + ${变量名}
+        ============================================================
+      </stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+    </TestPlan>
+    <hashTree>
+      <!-- ============================================================
+      CSV Data Set Config - 数据驱动的核心
+      关键属性：
+        filename:        CSV 文件路径（相对于 JMX 文件位置）
+        variableNames:   列名，逗号分隔，引用时用 ${列名}
+        ignoreFirstLine: 跳过 CSV 第一行（表头）
+        recycle:         数据取完后是否循环使用
+        shareMode:       all = 所有线程共享; thread = 每线程独立
+      ============================================================ -->
+      <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="CSV数据文件-5个用户数据" enabled="true">
+        <stringProp name="TestPlan.comments">
+          读取 test-data/users.csv
+          每行数据: username, password, expected_role, user_id
+          引用方式: ${username}, ${password}, ${expected_role}, ${user_id}
+        </stringProp>
+        <stringProp name="filename">test-data/users.csv</stringProp>
+        <stringProp name="fileEncoding">UTF-8</stringProp>
+        <!-- 变量名与CSV列一一对应，顺序必须一致 -->
+        <stringProp name="variableNames">username,password,expected_role,user_id</stringProp>
+        <!-- 第一行是表头，跳过不读 -->
+        <stringProp name="ignoreFirstLine">true</stringProp>
+        <stringProp name="delimiter">,</stringProp>
+        <boolProp name="quotedData">false</boolProp>
+        <!-- recycle=true: 5个线程取完5行后，第6个线程循环取第1行 -->
+        <boolProp name="recycle">true</boolProp>
+        <!-- stopThread=false: 数据取完后线程不停止（配合recycle循环） -->
+        <boolProp name="stopThread">false</boolProp>
+        <!-- shareMode.all: 所有线程共享同一份数据，按顺序分配 -->
+        <stringProp name="shareMode">shareMode.all</stringProp>
+      </CSVDataSet>
+      <hashTree/>
+
+      <!-- ============================================================
+      线程组: 线程数 = CSV 行数，保证每个用户用一行独立数据
+      ============================================================ -->
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="用户组-5线程匹配CSV5行" enabled="true">
+        <stringProp name="TestPlan.comments">
+          CSV有5行数据（不含表头），线程数设为5 -> 每个线程取一行
+          线程1取admin, 线程2取testuser, ... 线程5取manager
+        </stringProp>
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <stringProp name="ThreadGroup.num_threads">5</stringProp>
+        <!-- Ramp-Up=5秒, 每个线程间隔1秒启动, 模拟用户陆续登录 -->
+        <stringProp name="ThreadGroup.ramp_time">5</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="循环控制器" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">1</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.scheduler">false</stringProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+      </ThreadGroup>
+      <hashTree>
+        <!-- ============================================================
+        HTTP请求默认值: 所有请求共用协议、域名、端口
+        好处：切换测试环境只需改一处
+        ============================================================ -->
+        <ConfigTestElement guiclass="HttpDefaultsGui" testclass="ConfigTestElement" testname="HTTP请求默认值" enabled="true">
+          <stringProp name="HTTPSampler.domain">jsonplaceholder.typicode.com</stringProp>
+          <stringProp name="HTTPSampler.port">443</stringProp>
+          <stringProp name="HTTPSampler.protocol">https</stringProp>
+          <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+        </ConfigTestElement>
+        <hashTree/>
+
+        <!-- ============================================================
+        GET请求: 用 CSV 变量 ${user_id} 构造请求路径
+        5个线程 -> 5次请求, 路径分别是 /users/1, /users/2, ... /users/5
+        ============================================================ -->
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="GET-/users/${user_id}-CSV数据驱动路径" enabled="true">
+          <stringProp name="TestPlan.comments">
+            【关键知识点】变量引用 ${user_id}
+            - ${user_id} 来自 CSV 文件的 user_id 列
+            - JMeter 运行时用实际值替换: /users/1, /users/2, ... /users/5
+            - 变量可以在: path / body / header / assertion 任何地方使用
+            - testname 里也可以用变量, 方便在报告里区分不同数据的请求
+          </stringProp>
+          <stringProp name="HTTPSampler.method">GET</stringProp>
+          <!-- ${user_id} 会被 CSV 里的实际值替换 -->
+          <stringProp name="HTTPSampler.path">/users/${user_id}</stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <!-- 响应断言: 检查每个用户的查询都返回200 -->
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="断言-状态码200" enabled="true">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="200">200</stringProp>
+            </collectionProp>
+            <!-- 断言失败信息里也可以引用 CSV 变量, 方便定位是哪个用户的数据出错 -->
+            <stringProp name="Assertion.custom_message">用户 ${username}(ID=${user_id}) 查询失败，状态码不是200</stringProp>
+            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+            <intProp name="Assertion.test_type">8</intProp>
+          </ResponseAssertion>
+          <hashTree/>
+          <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="查看结果树" enabled="true">
+            <boolProp name="ResultCollector.error_logging">false</boolProp>
+          </ResultCollector>
+          <hashTree/>
+        </hashTree>
+
+        <!-- ============================================================
+        POST请求: 用 CSV 变量构造 JSON 请求体
+        body中的 ${username} 和 ${expected_role} 会被 CSV 值替换
+        ============================================================ -->
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="POST-/posts-参数化创建文章" enabled="true">
+          <stringProp name="TestPlan.comments">
+            【关键知识点】CSV 变量可用于请求体
+            - POST body 中的 ${username}, ${expected_role}, ${user_id}
+            - 每个线程发送不同的数据, 实现真正的数据驱动测试
+            - 实际发送: {"title":"Post by admin","body":"role: administrator","userId":"1"}
+            注意: Body Data 请在 JMeter GUI 中添加
+            在 HTTP Request -> Body Data 标签页输入 JSON
+          </stringProp>
+          <stringProp name="HTTPSampler.method">POST</stringProp>
+          <stringProp name="HTTPSampler.path">/posts</stringProp>
+          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <!-- Content-Type 头: 告诉服务器发送的是 JSON -->
+          <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="Content-Type: application/json" enabled="true">
+            <collectionProp name="HeaderManager.headers">
+              <elementProp name="" elementType="Header">
+                <stringProp name="Header.name">Content-Type</stringProp>
+                <stringProp name="Header.value">application/json; charset=UTF-8</stringProp>
+              </elementProp>
+            </collectionProp>
+          </HeaderManager>
+          <hashTree/>
+          <!-- JSONPath 断言: 检查返回的 JSON 中包含 id 字段, 确认创建成功 -->
+          <JSONPathAssertion guiclass="JSONPathAssertionGui" testclass="JSONPathAssertion" testname="断言-返回JSON包含id字段" enabled="true">
+            <stringProp name="JSON_PATH">$.id</stringProp>
+            <stringProp name="EXPECTED_VALUE"></stringProp>
+            <!-- JSONVALIDATION=false 表示只检查字段存在, 不验证具体值 -->
+            <boolProp name="JSONVALIDATION">false</boolProp>
+            <boolProp name="EXPECT_NULL">false</boolProp>
+            <boolProp name="INVERT">false</boolProp>
+          </JSONPathAssertion>
+          <hashTree/>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="断言-状态码201(Created)" enabled="true">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="201">201</stringProp>
+            </collectionProp>
+            <stringProp name="Assertion.custom_message">创建文章失败(user=${username})，期望HTTP 201</stringProp>
+            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+            <intProp name="Assertion.test_type">8</intProp>
+          </ResponseAssertion>
+          <hashTree/>
+          <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="查看结果树" enabled="true">
+            <boolProp name="ResultCollector.error_logging">false</boolProp>
+          </ResultCollector>
+          <hashTree/>
+        </hashTree>
+
+        <!-- 聚合报告: 查看整体性能指标 -->
+        <ResultCollector guiclass="StatVisualizer" testclass="ResultCollector" testname="聚合报告" enabled="true">
+          <boolProp name="ResultCollector.error_logging">false</boolProp>
+        </ResultCollector>
+        <hashTree/>
+      </hashTree>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan>
